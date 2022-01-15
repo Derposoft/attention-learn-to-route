@@ -9,3 +9,8 @@ __pycache__/
 *.tc_backward.*
 *.log
 *.bak
+
+# library-related folders
+attention_routing.egg-info/
+build/
+dist/

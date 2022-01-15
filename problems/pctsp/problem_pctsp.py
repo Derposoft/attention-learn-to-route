@@ -2,8 +2,8 @@ from torch.utils.data import Dataset
 import torch
 import os
 import pickle
-from problems.pctsp.state_pctsp import StatePCTSP
-from utils.beam_search import beam_search
+from attention_routing.problems.pctsp.state_pctsp import StatePCTSP
+from attention_routing.utils.beam_search import beam_search
 
 
 class PCTSP(object):

@@ -3,12 +3,12 @@ from torch import nn
 from torch.utils.checkpoint import checkpoint
 import math
 from typing import NamedTuple
-from utils.tensor_functions import compute_in_batches
+from attention_routing.utils.tensor_functions import compute_in_batches
 
-from nets.graph_encoder import GraphAttentionEncoder
+from attention_routing.nets.graph_encoder import GraphAttentionEncoder
 from torch.nn import DataParallel
-from utils.beam_search import CachedLookup
-from utils.functions import sample_many
+from attention_routing.utils.beam_search import CachedLookup
+from attention_routing.utils.functions import sample_many
 
 
 def set_decode_type(model, decode_type):

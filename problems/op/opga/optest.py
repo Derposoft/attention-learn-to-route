@@ -1,5 +1,5 @@
 import time
-import opevo
+import attention_routing.problems.op.opga.opevo as opevo
 
 files = [ 'test instances/set_64_1_15.txt' ]
 tmaxs = [ range( 15,  80 + 1, 5 ) ]
