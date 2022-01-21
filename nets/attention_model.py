@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 import math
@@ -121,7 +122,7 @@ class AttentionModel(nn.Module):
         if temp is not None:  # Do not change temperature if not provided
             self.temp = temp
 
-    def forward(self, input, return_pi=False):
+    def forward(self, input, edges=None, agent_nodes=None, return_pi=False):
         """
         :param input: (batch_size, graph_size, node_dim) input node features or dictionary with multiple tensors
         :param return_pi: whether to return the output sequences, this is optional as it is not compatible with
@@ -134,9 +135,9 @@ class AttentionModel(nn.Module):
         else:
             embeddings, _ = self.embedder(self._init_embed(input))
 
-        _log_p, pi = self._inner(input, embeddings)
+        _log_p, pi = self._inner(input, embeddings, edges)
 
-        cost, mask = self.problem.get_costs(input, pi)
+        cost, mask = self.problem.get_costs(input, pi) # TODO
         # Log likelyhood is calculated within the model since returning it per action does not work well with
         # DataParallel since sequences can be of different lengths
         ll = self._calc_log_likelihood(_log_p, pi, mask)
@@ -221,7 +222,7 @@ class AttentionModel(nn.Module):
         # TSP
         return self.init_embed(input)
 
-    def _inner(self, input, embeddings):
+    def _inner(self, input, embeddings, edges):
 
         outputs = []
         sequences = []
@@ -252,7 +253,7 @@ class AttentionModel(nn.Module):
             log_p, mask = self._get_log_p(fixed, state)
 
             # Select the indices of the next nodes in the sequences, result (batch_size) long
-            selected = self._select_node(log_p.exp()[:, 0, :], mask[:, 0, :])  # Squeeze out steps dimension
+            selected = self._select_node(log_p.exp()[:, 0, :], mask[:, 0, :], edges)  # Squeeze out steps dimension
 
             state = state.update(selected)
 
@@ -288,7 +289,7 @@ class AttentionModel(nn.Module):
             batch_rep, iter_rep
         )
 
-    def _select_node(self, probs, mask):
+    def _select_node(self, probs, mask, edges):
 
         assert (probs == probs).all(), "Probs should not contain any nans"
 
@@ -305,7 +306,25 @@ class AttentionModel(nn.Module):
             while mask.gather(1, selected.unsqueeze(-1)).data.any():
                 print('Sampled bad values, resampling!')
                 selected = probs.multinomial(1).squeeze(1)
-
+        
+        elif self.decode_type == "graph":
+            ''' TODO
+            # only make sure we select nodes that are connected in this graph from the current node that we're at
+            assert edges != None, "Edges not provided for edge-based decoding scheme"
+            # dictify edges for quick lookups
+            edges_d = {}
+            if type(edges) == list:
+                for edge in edges:
+                    if edge[0] not in edges_d: edges_d[edge[0]] = set([])
+                    edges_d[edge[0]].add(edge[1])
+            elif type(edges) == dict:
+                edges_d = edges
+            adjs = np.zeros(len(probs[0]))
+            '''
+            #selected = []
+            #for i in range(len(probs)): selected.append([])
+            #selected = torch.tensor(selected)
+            assert False, "Not implemented"
         else:
             assert False, "Unknown decode type"
         return selected
