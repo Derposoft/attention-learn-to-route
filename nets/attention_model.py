@@ -122,28 +122,36 @@ class AttentionModel(nn.Module):
         if temp is not None:  # Do not change temperature if not provided
             self.temp = temp
 
-    def forward(self, input, edges=None, agent_nodes=None, return_pi=False):
+    def forward(self, input, edges=None, agent_nodes=None, return_pi=False, return_log_p=False):
         """
         :param input: (batch_size, graph_size, node_dim) input node features or dictionary with multiple tensors
         :param return_pi: whether to return the output sequences, this is optional as it is not compatible with
         using DataParallel as the results may be of different lengths on different GPUs
         :return:
         """
-
         if self.checkpoint_encoder and self.training:  # Only checkpoint if we need gradients
             embeddings, _ = checkpoint(self.embedder, self._init_embed(input))
         else:
             embeddings, _ = self.embedder(self._init_embed(input))
 
         _log_p, pi = self._inner(input, embeddings, edges)
+        cost, mask = self.problem.get_costs(input, pi)
 
-        cost, mask = self.problem.get_costs(input, pi) # TODO
+        # Add mask if edges are provided
+        if edges:
+            assert agent_nodes != None, 'agent locations are required'
+            # exclude all nodes...
+            node_exclude_list = np.array(list(range(input.shape[1])))
+            # except for the ones that are connected to our current one.
+            mask = np.array([np.delete(node_exclude_list, list(edges[agent_node])) for agent_node in agent_nodes])
+
         # Log likelyhood is calculated within the model since returning it per action does not work well with
         # DataParallel since sequences can be of different lengths
-        ll = self._calc_log_likelihood(_log_p, pi, mask)
+        ll, log_p = self._calc_log_likelihood(_log_p, pi, mask)
         if return_pi:
             return cost, ll, pi
-
+        if return_log_p:
+            return cost, ll, log_p
         return cost, ll
 
     def beam_search(self, *args, **kwargs):
@@ -192,12 +200,12 @@ class AttentionModel(nn.Module):
 
         # Optional: mask out actions irrelevant to objective so they do not get reinforced
         if mask is not None:
-            log_p[mask] = 0
-
+            for i in range(len(mask)):
+                log_p[i][mask[i]] = 0
         assert (log_p > -1000).data.all(), "Logprobs should not be -inf, check sampling procedure!"
 
         # Calculate log_likelihood
-        return log_p.sum(1)
+        return log_p.sum(1), log_p
 
     def _init_embed(self, input):
 
