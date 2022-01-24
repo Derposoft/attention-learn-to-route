@@ -122,7 +122,7 @@ class AttentionModel(nn.Module):
         if temp is not None:  # Do not change temperature if not provided
             self.temp = temp
 
-    def forward(self, input, edges=None, agent_nodes=None, return_pi=False, return_log_p=False):
+    def forward(self, input, edges=None, agent_nodes=None, return_pi=False, return_log_p=False, mask_given_edges=True):
         """
         :param input: (batch_size, graph_size, node_dim) input node features or dictionary with multiple tensors
         :param return_pi: whether to return the output sequences, this is optional as it is not compatible with
@@ -140,7 +140,7 @@ class AttentionModel(nn.Module):
         cost, mask = self.problem.get_costs(input, pi)
 
         # Add mask if edges are provided
-        if edges:
+        if edges and mask_given_edges:
             assert agent_nodes != None, 'agent locations are required'
             # exclude all nodes...
             node_exclude_list = np.array(list(range(input.shape[1])))
