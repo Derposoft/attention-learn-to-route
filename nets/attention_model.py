@@ -127,6 +127,8 @@ class AttentionModel(nn.Module):
         :param input: (batch_size, graph_size, node_dim) input node features or dictionary with multiple tensors
         :param return_pi: whether to return the output sequences, this is optional as it is not compatible with
         using DataParallel as the results may be of different lengths on different GPUs
+        :param edges: dictionary of edge mappings from node_a -> {node_b, node_c, }. 0-indexed. MUST be used with agent_nodes
+        :param agent_nodes: a list of indices representing the location of the agent in each batch. 0-indexed. used to determine which edges to mask out using the edges parameter.
         :return:
         """
         if self.checkpoint_encoder and self.training:  # Only checkpoint if we need gradients
