@@ -145,7 +145,7 @@ class AttentionModel(nn.Module):
             # exclude all nodes...
             node_exclude_list = np.array(list(range(input.shape[1])))
             # except for the ones that are connected to our current one.
-            mask = np.array([np.delete(node_exclude_list, list(edges[agent_node])) for agent_node in agent_nodes])
+            mask = [np.delete(node_exclude_list, list(edges[agent_node])) for agent_node in agent_nodes]
 
         # Log likelyhood is calculated within the model since returning it per action does not work well with
         # DataParallel since sequences can be of different lengths
