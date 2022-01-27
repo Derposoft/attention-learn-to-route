@@ -3,13 +3,17 @@ import time
 from tqdm import tqdm
 import torch
 import math
+import sys
 
 from torch.utils.data import DataLoader
 from torch.nn import DataParallel
+import numpy as np
 
 from attention_routing.nets.attention_model import set_decode_type
 from attention_routing.utils.log_utils import log_values
 from attention_routing.utils import move_to
+
+from sigma_graph.envs.figure8.figure8_squad_rllib import Figure8SquadRLLib
 
 def get_inner_model(model):
     return model.module if isinstance(model, DataParallel) else model
@@ -75,13 +79,16 @@ def train_epoch(model, optimizer, baseline, lr_scheduler, epoch, val_dataset, pr
     training_dataset = baseline.wrap_dataset(problem.make_dataset(
         size=opts.graph_size, num_samples=opts.epoch_size, distribution=opts.data_distribution))
     training_dataloader = DataLoader(training_dataset, batch_size=opts.batch_size, num_workers=1)
+    #print(training_dataset)
+    #print(training_dataset[0])
 
     # Put model in train mode!
     model.train()
     set_decode_type(model, "sampling")
 
     for batch_id, batch in enumerate(tqdm(training_dataloader, disable=opts.no_progress_bar)):
-
+        #print(batch)
+        sys.exit()
         train_batch(
             model,
             optimizer,
@@ -132,19 +139,14 @@ def train_batch(
         step,
         batch,
         tb_logger,
-        opts,
-        rew=None,
-        edges=None,
-        agent_nodes=None
+        opts
 ):
     x, bl_val = baseline.unwrap_batch(batch)
     x = move_to(x, opts.device)
     bl_val = move_to(bl_val, opts.device) if bl_val is not None else None
 
     # Evaluate model, get costs and log probabilities
-    cost, log_likelihood = model(x, edges=edges, agent_nodes=agent_nodes)
-    if rew: # If we have a reward in a reinforcement learning scenario, train on that instead
-        cost = -rew
+    cost, log_likelihood = model(x)
 
     # Evaluate baseline, get baseline loss if any (only for critic)
     bl_val, bl_loss = baseline.eval(x, cost) if bl_val is None else (bl_val, 0)
