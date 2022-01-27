@@ -132,14 +132,19 @@ def train_batch(
         step,
         batch,
         tb_logger,
-        opts
+        opts,
+        rew=None,
+        edges=None,
+        agent_nodes=None
 ):
     x, bl_val = baseline.unwrap_batch(batch)
     x = move_to(x, opts.device)
     bl_val = move_to(bl_val, opts.device) if bl_val is not None else None
 
     # Evaluate model, get costs and log probabilities
-    cost, log_likelihood = model(x)
+    cost, log_likelihood = model(x, edges=edges, agent_nodes=agent_nodes)
+    if rew: # If we have a reward in a reinforcement learning scenario, train on that instead
+        cost = -rew
 
     # Evaluate baseline, get baseline loss if any (only for critic)
     bl_val, bl_loss = baseline.eval(x, cost) if bl_val is None else (bl_val, 0)
