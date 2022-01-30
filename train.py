@@ -13,7 +13,9 @@ from attention_routing.nets.attention_model import set_decode_type
 from attention_routing.utils.log_utils import log_values
 from attention_routing.utils import move_to
 
-from sigma_graph.envs.figure8.figure8_squad_rllib import Figure8SquadRLLib
+TRAIN_SETTINGS = {
+    'constrain_data': False, # used to test the relative ineffectiveness of training on the same few data points over and over vs all the data
+}
 
 def get_inner_model(model):
     return model.module if isinstance(model, DataParallel) else model
@@ -85,23 +87,37 @@ def train_epoch(model, optimizer, baseline, lr_scheduler, epoch, val_dataset, pr
     # Put model in train mode!
     model.train()
     set_decode_type(model, "sampling")
-
-    for batch_id, batch in enumerate(tqdm(training_dataloader, disable=opts.no_progress_bar)):
-        #print(batch)
-        sys.exit()
-        train_batch(
-            model,
-            optimizer,
-            baseline,
-            epoch,
-            batch_id,
-            step,
-            batch,
-            tb_logger,
-            opts
-        )
-
-        step += 1
+    _batch_id, _batch = None, None
+    if TRAIN_SETTINGS['constrain_data']:
+        for batch_id, batch in enumerate(tqdm(training_dataloader, disable=opts.no_progress_bar)):
+            _batch_id, _batch = batch_id, batch
+            break
+        for i in range(1000):
+            train_batch(
+                model,
+                optimizer,
+                baseline,
+                epoch,
+                _batch_id,
+                i,
+                _batch,
+                tb_logger,
+                opts
+            )
+    else:
+        for batch_id, batch in enumerate(tqdm(training_dataloader, disable=opts.no_progress_bar)):
+            train_batch(
+                model,
+                optimizer,
+                baseline,
+                epoch,
+                batch_id,
+                step,
+                batch,
+                tb_logger,
+                opts
+            )
+            step += 1
 
     epoch_duration = time.time() - start_time
     print("Finished epoch {}, took {} s".format(epoch, time.strftime('%H:%M:%S', time.gmtime(epoch_duration))))
@@ -142,18 +158,23 @@ def train_batch(
         opts
 ):
     x, bl_val = baseline.unwrap_batch(batch)
+    if TRAIN_SETTINGS['constrain_data']:
+        x = x[0:10]
+        bl_val = bl_val[0:10] if bl_val is not None else None
     x = move_to(x, opts.device)
     bl_val = move_to(bl_val, opts.device) if bl_val is not None else None
 
     # Evaluate model, get costs and log probabilities
     cost, log_likelihood = model(x)
-
+    
     # Evaluate baseline, get baseline loss if any (only for critic)
     bl_val, bl_loss = baseline.eval(x, cost) if bl_val is None else (bl_val, 0)
 
     # Calculate loss
     reinforce_loss = ((cost - bl_val) * log_likelihood).mean()
     loss = reinforce_loss + bl_loss
+    if step % 10 == 0:
+        print(loss)
 
     # Perform backward pass and optimization step
     optimizer.zero_grad()
