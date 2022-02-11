@@ -11,6 +11,8 @@ from torch.nn import DataParallel
 from attention_routing.utils.beam_search import CachedLookup
 from attention_routing.utils.functions import sample_many
 
+#from attention_study.model.utils import get_probs_mask
+
 
 def set_decode_type(model, decode_type):
     if isinstance(model, DataParallel):
@@ -142,10 +144,9 @@ class AttentionModel(nn.Module):
         # Add mask if edges are provided
         if edges and mask_given_edges:
             assert agent_nodes != None, 'agent locations are required'
-            # exclude all nodes...
+            # exclude all nodes except for the ones that are connected to our current one.
             node_exclude_list = np.array(list(range(input.shape[1])))
-            # except for the ones that are connected to our current one.
-            mask = [np.delete(node_exclude_list, list(edges[agent_node])) for agent_node in agent_nodes]
+            mask = [np.delete(node_exclude_list, list(edges[agent_node])+[agent_node]) for agent_node in agent_nodes]
 
         # Log likelyhood is calculated within the model since returning it per action does not work well with
         # DataParallel since sequences can be of different lengths
